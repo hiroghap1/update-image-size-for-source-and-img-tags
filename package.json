@@ -2,11 +2,12 @@
   "name": "update-image-size-source",
   "displayName": "Update Image Size for Source and Img Tags",
   "description": "Update image size attributes (width/height) and add loading='lazy' for source and img tags",
-  "version": "0.1.6",
-  "publisher": "HASEGAWAYoshihiro",
+  "version": "0.1.7",
+  "icon": "images/icon.png",
+  "publisher": "hasegawa-yoshihiro",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hasegawayoshihiro/update-image-size-source"
+    "url": "https://github.com/hiroghap1/update-image-size-for-source-and-img-tags"
   },
   "engines": {
     "vscode": "^1.80.0"

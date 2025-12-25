@@ -12,7 +12,6 @@ out/test/
 .DS_Store
 .claude/
 test-sample.html
-images/
 readme.md
 node_modules/*
 !node_modules/image-size/
