@@ -1,0 +1,66 @@
+{
+  "name": "update-image-size-source",
+  "displayName": "Update Image Size for Source and Img Tags",
+  "description": "Update image size attributes (width/height) and add loading='lazy' for source and img tags",
+  "version": "0.1.6",
+  "publisher": "HASEGAWAYoshihiro",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hasegawayoshihiro/update-image-size-source"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:html"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "updateImageSizeSource.updateSize",
+        "title": "Update Image Size"
+      },
+      {
+        "command": "updateImageSizeSource.addLoadingLazy",
+        "title": "Update Image Size + Add Loading Lazy"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "updateImageSizeSource.updateSize",
+        "key": "ctrl+alt+i",
+        "mac": "cmd+alt+i",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "updateImageSizeSource.addLoadingLazy",
+        "key": "ctrl+alt+shift+i",
+        "mac": "cmd+alt+shift+i",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "eslint": "^8.47.0",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "image-size": "^1.0.2"
+  }
+}
