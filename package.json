@@ -2,7 +2,7 @@
   "name": "update-image-size-source",
   "displayName": "Update Image Size for Source and Img Tags",
   "description": "Update image size attributes (width/height) and add loading='lazy' for source and img tags",
-  "version": "0.1.7",
+  "version": "0.1.9",
   "icon": "images/icon.png",
   "publisher": "hasegawa-yoshihiro",
   "repository": {

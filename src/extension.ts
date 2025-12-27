@@ -59,59 +59,64 @@ async function updateImageSize(
     document: vscode.TextDocument,
     position: vscode.Position
 ) {
-    // Find the image tag (source or img) that contains the cursor
+    // First, try to find a source or img tag at cursor position
     const imageTagInfo = findImageTag(document, position);
+    
+    if (imageTagInfo) {
+        // Found a source or img tag - update only this tag
+        const { tagRange, tagText, tagType } = imageTagInfo;
+        
+        outputChannel.appendLine(`Found ${tagType} tag: ${tagText}`);
 
-    if (!imageTagInfo) {
-        vscode.window.showErrorMessage('Cursor is not inside a <source> or <img> tag');
-        return;
-    }
+        const imagePath = extractImagePath(tagText, document.uri.fsPath);
 
-    const { tagRange, tagText, tagType } = imageTagInfo;
-
-    outputChannel.appendLine(`Found ${tagType} tag: ${tagText}`);
-
-    // Extract image path from srcset or src attribute
-    const imagePath = extractImagePath(tagText, document.uri.fsPath);
-
-    if (!imagePath) {
-        outputChannel.appendLine(`Could not extract image path from tag: ${tagText}`);
-        vscode.window.showErrorMessage('No valid image source found in <source> tag. Please ensure the tag has a src or srcset attribute.');
-        outputChannel.show();
-        return;
-    }
-
-    outputChannel.appendLine(`Resolved image path: ${imagePath}`);
-
-    // Get image dimensions
-    const dimensions = await getImageDimensions(imagePath);
-
-    if (!dimensions) {
-        outputChannel.appendLine(`Failed to read image dimensions from: ${imagePath}`);
-
-        // Check if file exists
-        if (!fs.existsSync(imagePath)) {
-            vscode.window.showErrorMessage(`Image file not found: ${imagePath}\n\nPlease ensure the image file exists at this location.`);
-        } else {
-            vscode.window.showErrorMessage(`Could not read image dimensions from: ${imagePath}\n\nThe file exists but may be corrupted or in an unsupported format.`);
+        if (!imagePath) {
+            outputChannel.appendLine(`Could not extract image path from tag: ${tagText}`);
+            vscode.window.showErrorMessage('No valid image source found. Please ensure the tag has a src or srcset attribute.');
+            outputChannel.show();
+            return;
         }
-        outputChannel.show();
+
+        outputChannel.appendLine(`Resolved image path: ${imagePath}`);
+
+        const dimensions = await getImageDimensions(imagePath);
+
+        if (!dimensions) {
+            outputChannel.appendLine(`Failed to read image dimensions from: ${imagePath}`);
+
+            if (!fs.existsSync(imagePath)) {
+                vscode.window.showErrorMessage(`Image file not found: ${imagePath}\n\nPlease ensure the image file exists at this location.`);
+            } else {
+                vscode.window.showErrorMessage(`Could not read image dimensions from: ${imagePath}\n\nThe file exists but may be corrupted or in an unsupported format.`);
+            }
+            outputChannel.show();
+            return;
+        }
+
+        outputChannel.appendLine(`Image dimensions: ${dimensions.width}x${dimensions.height}`);
+
+        const updatedTag = updateDimensions(tagText, dimensions.width, dimensions.height);
+
+        await editor.edit(editBuilder => {
+            editBuilder.replace(tagRange, updatedTag);
+        });
+
+        vscode.window.showInformationMessage(
+            `Updated image size: ${dimensions.width}x${dimensions.height}`
+        );
         return;
     }
 
-    outputChannel.appendLine(`Image dimensions: ${dimensions.width}x${dimensions.height}`);
+    // If no image tag found, check if cursor is on a picture tag
+    const pictureInfo = findPictureTag(document, position);
+    
+    if (pictureInfo) {
+        // Handle picture tag case - update all source and img tags within it
+        await updatePictureTagSize(editor, document, pictureInfo);
+        return;
+    }
 
-    // Update or add width and height attributes
-    const updatedTag = updateDimensions(tagText, dimensions.width, dimensions.height);
-
-    // Apply the edit
-    await editor.edit(editBuilder => {
-        editBuilder.replace(tagRange, updatedTag);
-    });
-
-    vscode.window.showInformationMessage(
-        `Updated image size: ${dimensions.width}x${dimensions.height}`
-    );
+    vscode.window.showErrorMessage('Cursor is not inside a <source>, <img>, or <picture> tag');
 }
 
 async function addLoadingLazy(
@@ -119,60 +124,75 @@ async function addLoadingLazy(
     document: vscode.TextDocument,
     position: vscode.Position
 ) {
-    // Find the image tag (source or img) that contains the cursor
+    // First, try to find a source or img tag at cursor position
     const imageTagInfo = findImageTag(document, position);
+    
+    if (imageTagInfo) {
+        // Found a source or img tag - update only this tag
+        const { tagRange, tagText, tagType } = imageTagInfo;
+        
+        outputChannel.appendLine(`Found ${tagType} tag: ${tagText}`);
 
-    if (!imageTagInfo) {
-        vscode.window.showErrorMessage('Cursor is not inside a <source> or <img> tag');
-        return;
-    }
+        const imagePath = extractImagePath(tagText, document.uri.fsPath);
 
-    const { tagRange, tagText, tagType } = imageTagInfo;
-
-    outputChannel.appendLine(`Found ${tagType} tag: ${tagText}`);
-
-    // Extract image path from srcset or src attribute
-    const imagePath = extractImagePath(tagText, document.uri.fsPath);
-
-    if (!imagePath) {
-        outputChannel.appendLine(`Could not extract image path from tag: ${tagText}`);
-        vscode.window.showErrorMessage('No valid image source found. Please ensure the tag has a src or srcset attribute.');
-        outputChannel.show();
-        return;
-    }
-
-    outputChannel.appendLine(`Resolved image path: ${imagePath}`);
-
-    // Get image dimensions
-    const dimensions = await getImageDimensions(imagePath);
-
-    if (!dimensions) {
-        outputChannel.appendLine(`Failed to read image dimensions from: ${imagePath}`);
-
-        // Check if file exists
-        if (!fs.existsSync(imagePath)) {
-            vscode.window.showErrorMessage(`Image file not found: ${imagePath}\n\nPlease ensure the image file exists at this location.`);
-        } else {
-            vscode.window.showErrorMessage(`Could not read image dimensions from: ${imagePath}\n\nThe file exists but may be corrupted or in an unsupported format.`);
+        if (!imagePath) {
+            outputChannel.appendLine(`Could not extract image path from tag: ${tagText}`);
+            vscode.window.showErrorMessage('No valid image source found. Please ensure the tag has a src or srcset attribute.');
+            outputChannel.show();
+            return;
         }
-        outputChannel.show();
+
+        outputChannel.appendLine(`Resolved image path: ${imagePath}`);
+
+        const dimensions = await getImageDimensions(imagePath);
+
+        if (!dimensions) {
+            outputChannel.appendLine(`Failed to read image dimensions from: ${imagePath}`);
+
+            if (!fs.existsSync(imagePath)) {
+                vscode.window.showErrorMessage(`Image file not found: ${imagePath}\n\nPlease ensure the image file exists at this location.`);
+            } else {
+                vscode.window.showErrorMessage(`Could not read image dimensions from: ${imagePath}\n\nThe file exists but may be corrupted or in an unsupported format.`);
+            }
+            outputChannel.show();
+            return;
+        }
+
+        outputChannel.appendLine(`Image dimensions: ${dimensions.width}x${dimensions.height}`);
+
+        let updatedTag = updateDimensions(tagText, dimensions.width, dimensions.height);
+        
+        // Add loading="lazy" only to img tags
+        if (tagType === 'img') {
+            updatedTag = updateLoadingAttribute(updatedTag);
+        }
+
+        await editor.edit(editBuilder => {
+            editBuilder.replace(tagRange, updatedTag);
+        });
+
+        if (tagType === 'img') {
+            vscode.window.showInformationMessage(
+                `Updated: ${dimensions.width}x${dimensions.height} + loading="lazy"`
+            );
+        } else {
+            vscode.window.showInformationMessage(
+                `Updated image size: ${dimensions.width}x${dimensions.height}`
+            );
+        }
         return;
     }
 
-    outputChannel.appendLine(`Image dimensions: ${dimensions.width}x${dimensions.height}`);
+    // If no image tag found, check if cursor is on a picture tag
+    const pictureInfo = findPictureTag(document, position);
+    
+    if (pictureInfo) {
+        // Handle picture tag case - update all source and img tags within it
+        await updatePictureTagWithLazy(editor, document, pictureInfo);
+        return;
+    }
 
-    // Update dimensions and add loading="lazy"
-    let updatedTag = updateDimensions(tagText, dimensions.width, dimensions.height);
-    updatedTag = updateLoadingAttribute(updatedTag);
-
-    // Apply the edit
-    await editor.edit(editBuilder => {
-        editBuilder.replace(tagRange, updatedTag);
-    });
-
-    vscode.window.showInformationMessage(
-        `Updated: ${dimensions.width}x${dimensions.height} + loading="lazy"`
-    );
+    vscode.window.showErrorMessage('Cursor is not inside a <source>, <img>, or <picture> tag');
 }
 
 function findImageTag(
@@ -181,6 +201,16 @@ function findImageTag(
 ): { tagRange: vscode.Range; tagText: string; tagType: string } | null {
     const text = document.getText();
     const offset = document.offsetAt(position);
+
+    // First, check if cursor is within a picture opening tag
+    const pictureOpenStart = text.lastIndexOf('<picture', offset);
+    if (pictureOpenStart !== -1) {
+        const pictureOpenEnd = text.indexOf('>', pictureOpenStart);
+        // If cursor is within the picture opening tag, don't find image tags
+        if (pictureOpenEnd !== -1 && offset >= pictureOpenStart && offset <= pictureOpenEnd) {
+            return null;
+        }
+    }
 
     // Try to find <source> tag first
     let sourceStart = text.lastIndexOf('<source', offset);
@@ -233,6 +263,232 @@ function findImageTag(
     );
 
     return { tagRange, tagText, tagType };
+}
+
+function findPictureTag(
+    document: vscode.TextDocument,
+    position: vscode.Position
+): { tagRange: vscode.Range; tagText: string } | null {
+    const text = document.getText();
+    const offset = document.offsetAt(position);
+
+    // Find the nearest <picture tag before cursor
+    const pictureStart = text.lastIndexOf('<picture', offset);
+    
+    if (pictureStart === -1) {
+        return null;
+    }
+
+    // Find the closing > of the opening <picture> tag
+    const pictureOpenEnd = text.indexOf('>', pictureStart);
+    if (pictureOpenEnd === -1) {
+        return null;
+    }
+
+    // Verify cursor is within the opening <picture> tag only (between < and >)
+    if (offset < pictureStart || offset > pictureOpenEnd) {
+        return null;
+    }
+
+    // Find the closing </picture> tag after the opening tag
+    const pictureCloseStart = text.indexOf('</picture>', pictureOpenEnd);
+    if (pictureCloseStart === -1) {
+        return null;
+    }
+
+    const pictureCloseEnd = pictureCloseStart + '</picture>'.length;
+
+    const tagText = text.substring(pictureStart, pictureCloseEnd);
+    const tagRange = new vscode.Range(
+        document.positionAt(pictureStart),
+        document.positionAt(pictureCloseEnd)
+    );
+
+    return { tagRange, tagText };
+}
+
+async function updatePictureTagSize(
+    editor: vscode.TextEditor,
+    document: vscode.TextDocument,
+    pictureInfo: { tagRange: vscode.Range; tagText: string }
+): Promise<void> {
+    const { tagRange, tagText } = pictureInfo;
+    
+    outputChannel.appendLine(`Found picture tag`);
+    outputChannel.appendLine(`Picture tag content: ${tagText}`);
+
+    // Extract all source and img tags
+    const sourceTags = extractTagsFromText(tagText, 'source');
+    const imgTags = extractTagsFromText(tagText, 'img');
+
+    outputChannel.appendLine(`Found ${sourceTags.length} source tags and ${imgTags.length} img tags`);
+    
+    if (sourceTags.length > 0) {
+        sourceTags.forEach((tag, idx) => {
+            outputChannel.appendLine(`Source tag ${idx}: ${tag.text}`);
+        });
+    }
+    
+    if (imgTags.length > 0) {
+        imgTags.forEach((tag, idx) => {
+            outputChannel.appendLine(`Img tag ${idx}: ${tag.text}`);
+        });
+    }
+
+    if (sourceTags.length === 0 && imgTags.length === 0) {
+        vscode.window.showErrorMessage('No <source> or <img> tags found within <picture>');
+        return;
+    }
+
+    // Combine all tags
+    const allTags = [...sourceTags, ...imgTags];
+
+    // Get dimensions for each tag individually
+    let updatedPictureTag = tagText;
+    let successCount = 0;
+    
+    for (const tag of allTags) {
+        const imagePath = extractImagePath(tag.text, document.uri.fsPath);
+        if (!imagePath) {
+            outputChannel.appendLine(`Could not extract image path from: ${tag.text}`);
+            continue;
+        }
+
+        outputChannel.appendLine(`Resolved image path: ${imagePath}`);
+        const dimensions = await getImageDimensions(imagePath);
+        
+        if (!dimensions) {
+            outputChannel.appendLine(`Failed to get dimensions for: ${imagePath}`);
+            continue;
+        }
+
+        outputChannel.appendLine(`Image dimensions for this tag: ${dimensions.width}x${dimensions.height}`);
+
+        const updatedTag = updateDimensions(tag.text, dimensions.width, dimensions.height);
+        outputChannel.appendLine(`Original tag: ${tag.text}`);
+        outputChannel.appendLine(`Updated tag: ${updatedTag}`);
+        
+        updatedPictureTag = updatedPictureTag.split(tag.text).join(updatedTag);
+        successCount++;
+    }
+
+    if (successCount === 0) {
+        vscode.window.showErrorMessage('Could not determine image dimensions for any tag within <picture>');
+        outputChannel.show();
+        return;
+    }
+
+    outputChannel.appendLine(`Final picture tag: ${updatedPictureTag}`);
+
+    // Apply the edit
+    await editor.edit(editBuilder => {
+        editBuilder.replace(tagRange, updatedPictureTag);
+    });
+
+    vscode.window.showInformationMessage(
+        `Updated ${successCount} tag(s) in <picture> with their respective dimensions`
+    );
+}
+
+async function updatePictureTagWithLazy(
+    editor: vscode.TextEditor,
+    document: vscode.TextDocument,
+    pictureInfo: { tagRange: vscode.Range; tagText: string }
+): Promise<void> {
+    const { tagRange, tagText } = pictureInfo;
+    
+    outputChannel.appendLine(`Found picture tag`);
+    outputChannel.appendLine(`Picture tag content: ${tagText}`);
+
+    // Extract all source and img tags
+    const sourceTags = extractTagsFromText(tagText, 'source');
+    const imgTags = extractTagsFromText(tagText, 'img');
+
+    outputChannel.appendLine(`Found ${sourceTags.length} source tags and ${imgTags.length} img tags`);
+    
+    if (sourceTags.length > 0) {
+        sourceTags.forEach((tag, idx) => {
+            outputChannel.appendLine(`Source tag ${idx}: ${tag.text}`);
+        });
+    }
+    
+    if (imgTags.length > 0) {
+        imgTags.forEach((tag, idx) => {
+            outputChannel.appendLine(`Img tag ${idx}: ${tag.text}`);
+        });
+    }
+
+    if (sourceTags.length === 0 && imgTags.length === 0) {
+        vscode.window.showErrorMessage('No <source> or <img> tags found within <picture>');
+        return;
+    }
+
+    // Combine all tags
+    const allTags = [...sourceTags, ...imgTags];
+
+    // Get dimensions for each tag individually
+    let updatedPictureTag = tagText;
+    let successCount = 0;
+    
+    for (const tag of allTags) {
+        const imagePath = extractImagePath(tag.text, document.uri.fsPath);
+        if (!imagePath) {
+            outputChannel.appendLine(`Could not extract image path from: ${tag.text}`);
+            continue;
+        }
+
+        outputChannel.appendLine(`Resolved image path: ${imagePath}`);
+        const dimensions = await getImageDimensions(imagePath);
+        
+        if (!dimensions) {
+            outputChannel.appendLine(`Failed to get dimensions for: ${imagePath}`);
+            continue;
+        }
+
+        outputChannel.appendLine(`Image dimensions for this tag: ${dimensions.width}x${dimensions.height}`);
+
+        let updatedTag = updateDimensions(tag.text, dimensions.width, dimensions.height);
+        
+        // Add loading="lazy" only to img tags
+        if (tag.type === 'img') {
+            updatedTag = updateLoadingAttribute(updatedTag);
+        }
+        
+        outputChannel.appendLine(`Original tag: ${tag.text}`);
+        outputChannel.appendLine(`Updated tag: ${updatedTag}`);
+        
+        updatedPictureTag = updatedPictureTag.split(tag.text).join(updatedTag);
+        successCount++;
+    }
+
+    if (successCount === 0) {
+        vscode.window.showErrorMessage('Could not determine image dimensions for any tag within <picture>');
+        outputChannel.show();
+        return;
+    }
+
+    outputChannel.appendLine(`Final picture tag: ${updatedPictureTag}`);
+
+    // Apply the edit
+    await editor.edit(editBuilder => {
+        editBuilder.replace(tagRange, updatedPictureTag);
+    });
+
+    vscode.window.showInformationMessage(
+        `Updated ${successCount} tag(s) in <picture> with their respective dimensions and loading="lazy" to <img>`
+    );
+}
+
+function extractTagsFromText(text: string, tagName: string): Array<{ text: string; type: string }> {
+    const regex = new RegExp(`<${tagName}[^>]*>`, 'g');
+    const tags: Array<{ text: string; type: string }> = [];
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        tags.push({ text: match[0], type: tagName });
+    }
+
+    return tags;
 }
 
 function extractImagePath(tagText: string, documentPath: string): string | null {
@@ -388,7 +644,10 @@ function updateDimensions(tagText: string, width: number, height: number): strin
         // Update existing height
         updatedTag = updatedTag.replace(heightRegex, ` height="${height}"`);
     } else {
-        // Add height before the closing >
+        // Add height before the closing > - check again after width might have been added
+        if (!updatedTag.endsWith('>')) {
+            updatedTag += '>';
+        }
         updatedTag = updatedTag.replace(/>$/, ` height="${height}">`);
     }
 

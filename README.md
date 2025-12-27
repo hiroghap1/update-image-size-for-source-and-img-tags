@@ -1,16 +1,18 @@
 # Update Image Size for Source and Img Tags
 
-VS Code拡張機能で、Emmetの「Update Image Size」機能を`<source>`タグと`<img>`タグで使えるようにします。さらに、`loading="lazy"`属性も簡単に追加できます。
+VS Code拡張機能で、Emmetの「Update Image Size」機能を`<source>`タグ、`<img>`タグ、そして`<picture>`タグで使えるようにします。さらに、`loading="lazy"`属性も簡単に追加できます。
 
 ## 機能
 
 ### 1. 画像サイズの自動更新
 - `<source>`タグと`<img>`タグ内の画像パスから画像サイズを自動取得
 - `width`と`height`属性を自動的に追加または更新
+- `<picture>`タグ上で実行時、`<picture>`内のすべての`<source>`と`<img>`タグを一括更新
 - `src`属性と`srcset`属性の両方に対応
 
-### 2. 画像サイズ + Loading Lazy属性の一括追加
-- `<source>`タグと`<img>`タグに`width`、`height`、`loading="lazy"`属性を一括で追加
+### 2. 画像サイズ + Loading Lazy属性の追加
+- `<img>`タグに`width`、`height`、`loading="lazy"`属性を一括で追加
+- `<picture>`タグ上で実行時、`<picture>`内のすべてのタグに対応（`loading="lazy"`は`<img>`タグのみ）
 - 既存の属性がある場合は更新
 
 ## 使い方
@@ -18,40 +20,42 @@ VS Code拡張機能で、Emmetの「Update Image Size」機能を`<source>`タ�
 ### 画像サイズの更新
 
 1. HTMLファイルを開く
-2. `<source>`タグまたは`<img>`タグ内にカーソルを置く
+2. `<source>`タグ、`<img>`タグ、または`<picture>`タグ上にカーソルを置く
 3. 以下のいずれかの方法でコマンドを実行：
    - コマンドパレット（`Cmd+Shift+P` / `Ctrl+Shift+P`）から「**Update Image Size**」を選択
    - キーボードショートカット：`Cmd+Alt+I`（Mac）/ `Ctrl+Alt+I`（Windows/Linux）
 
-### 画像サイズ + Loading Lazy属性の一括追加
+### 画像サイズ + Loading Lazy属性の追加
 
 1. HTMLファイルを開く
-2. `<source>`タグまたは`<img>`タグ内にカーソルを置く
+2. `<img>`タグまたは`<picture>`タグ上にカーソルを置く
 3. 以下のいずれかの方法でコマンドを実行：
    - コマンドパレット（`Cmd+Shift+P` / `Ctrl+Shift+P`）から「**Update Image Size + Add Loading Lazy**」を選択
    - キーボードショートカット：`Cmd+Alt+Shift+I`（Mac）/ `Ctrl+Alt+Shift+I`（Windows/Linux）
 
 ## 例
 
-### 画像サイズ更新の例
+### Picture タグでの使用例
 
 #### 実行前
 ```html
 <picture>
-  <source srcset="image.webp" type="image/webp">
+  <source srcset="image-wide.webp" media="(min-width: 1200px)">
+  <source srcset="image-medium.webp" media="(min-width: 800px)">
   <img src="image.jpg" alt="Sample">
 </picture>
 ```
 
-#### 実行後（画像が800x600pxの場合）
+#### 実行後（各画像が異なるサイズの場合）
 ```html
 <picture>
-  <source srcset="image.webp" type="image/webp" width="800" height="600">
-  <img src="image.jpg" alt="Sample" width="800" height="600">
+  <source srcset="image-wide.webp" media="(min-width: 1200px)" width="1200" height="600">
+  <source srcset="image-medium.webp" media="(min-width: 800px)" width="800" height="500">
+  <img src="image.jpg" alt="Sample" width="600" height="400">
 </picture>
 ```
 
-### 画像サイズ + Loading Lazy一括追加の例
+### 単一タグでの使用例
 
 #### 実行前
 ```html
@@ -61,6 +65,11 @@ VS Code拡張機能で、Emmetの「Update Image Size」機能を`<source>`タ�
 #### 実行後（画像が800x600pxの場合）
 ```html
 <img src="image.jpg" alt="Sample" width="800" height="600" loading="lazy">
+```
+
+#### Source タグの場合（Loading Lazy は付与されません）
+```html
+<source srcset="image.webp" type="image/webp" width="800" height="600">
 ```
 
 ## キーボードショートカット

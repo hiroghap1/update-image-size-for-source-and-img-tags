@@ -10,14 +10,15 @@
 
     <h2>例1: srcset属性を持つsourceタグ</h2>
     <picture>
-        <source srcset="images/img-kikaku1.jpg">
-        <img src="images/sample.jpg" alt="Sample Image">
+        <source srcset="images/icon.png" width="128" height="128">
+        <img src="images/icon.png" alt="Sample Image" width="128" height="128" loading="lazy">
     </picture>
 
     <h2>例2: src属性を持つsourceタグ</h2>
     <picture>
-        <source src="images/photo.png" media="(min-width: 800px)">
-        <img src="images/photo-small.png" alt="Photo">
+        <source src="https://tada-fla.com/wp-content/uploads/2019/09/keyvisual-facconsultation.jpg" media="(min-width: 1200px)">
+        <source src="https://tada-fla.com/wp-content/uploads/2019/09/keyvisual-umeboshi.jpg" media="(min-width: 800px)">
+        <img src="images/icon.png" alt="Photo">
     </picture>
 
     <h2>例3: 既にwidth/height属性があるsourceタグ</h2>
