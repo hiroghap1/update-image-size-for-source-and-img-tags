@@ -8,7 +8,9 @@
       "Bash(npm run compile:*)",
       "Bash(tree:*)",
       "Bash(npx @vscode/vsce:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx ovsx:*)",
+      "Bash(curl:*)"
     ]
   }
 }
