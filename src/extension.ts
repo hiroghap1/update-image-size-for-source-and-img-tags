@@ -51,7 +51,46 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(updateSizeCommand, addLoadingLazyCommand);
+    // Command: Update all images in page
+    let updateAllImagesCommand = vscode.commands.registerCommand('updateImageSizeSource.updateAllImages', async () => {
+        const editor = vscode.window.activeTextEditor;
+
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return;
+        }
+
+        const document = editor.document;
+
+        try {
+            await updateAllImagesInPage(editor, document);
+        } catch (error) {
+            outputChannel.appendLine(`Error: ${error}`);
+            vscode.window.showErrorMessage(`Failed to update all images: ${error}`);
+        }
+    });
+
+    // Command: Update all images with loading lazy after cursor
+    let updateAllImagesWithLazyCommand = vscode.commands.registerCommand('updateImageSizeSource.updateAllImagesWithLazy', async () => {
+        const editor = vscode.window.activeTextEditor;
+
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return;
+        }
+
+        const document = editor.document;
+        const position = editor.selection.active;
+
+        try {
+            await updateAllImagesWithLazyAfterCursor(editor, document, position);
+        } catch (error) {
+            outputChannel.appendLine(`Error: ${error}`);
+            vscode.window.showErrorMessage(`Failed to update all images with lazy loading: ${error}`);
+        }
+    });
+
+    context.subscriptions.push(updateSizeCommand, addLoadingLazyCommand, updateAllImagesCommand, updateAllImagesWithLazyCommand);
 }
 
 async function updateImageSize(
@@ -479,13 +518,13 @@ async function updatePictureTagWithLazy(
     );
 }
 
-function extractTagsFromText(text: string, tagName: string): Array<{ text: string; type: string }> {
+function extractTagsFromText(text: string, tagName: string): Array<{ text: string; type: string; index: number }> {
     const regex = new RegExp(`<${tagName}[^>]*>`, 'g');
-    const tags: Array<{ text: string; type: string }> = [];
+    const tags: Array<{ text: string; type: string; index: number }> = [];
     let match;
 
     while ((match = regex.exec(text)) !== null) {
-        tags.push({ text: match[0], type: tagName });
+        tags.push({ text: match[0], type: tagName, index: match.index });
     }
 
     return tags;
@@ -669,6 +708,171 @@ function updateLoadingAttribute(tagText: string): string {
     }
 
     return updatedTag;
+}
+
+async function updateAllImagesInPage(
+    editor: vscode.TextEditor,
+    document: vscode.TextDocument
+): Promise<void> {
+    const text = document.getText();
+
+    // Find all img and source tags in the document
+    const sourceTags = extractTagsFromText(text, 'source');
+    const imgTags = extractTagsFromText(text, 'img');
+
+    const allTags = [...sourceTags, ...imgTags];
+
+    if (allTags.length === 0) {
+        vscode.window.showErrorMessage('No <img> or <source> tags found in the document');
+        return;
+    }
+
+    outputChannel.appendLine(`Found ${allTags.length} image tags (${sourceTags.length} source, ${imgTags.length} img)`);
+
+    // Sort tags by their position in reverse order (process from end to beginning)
+    const sortedTags = allTags.sort((a, b) => b.index - a.index);
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    // Build array of edits to apply
+    const edits: Array<{ range: vscode.Range; newText: string }> = [];
+
+    for (const tag of sortedTags) {
+        const imagePath = extractImagePath(tag.text, document.uri.fsPath);
+        if (!imagePath) {
+            outputChannel.appendLine(`Could not extract image path from: ${tag.text}`);
+            failedCount++;
+            continue;
+        }
+
+        const dimensions = await getImageDimensions(imagePath);
+        if (!dimensions) {
+            outputChannel.appendLine(`Failed to get dimensions for: ${imagePath}`);
+            failedCount++;
+            continue;
+        }
+
+        outputChannel.appendLine(`${tag.type} tag at ${tag.index}: ${dimensions.width}x${dimensions.height} - ${imagePath}`);
+
+        const updatedTag = updateDimensions(tag.text, dimensions.width, dimensions.height);
+
+        const startPos = document.positionAt(tag.index);
+        const endPos = document.positionAt(tag.index + tag.text.length);
+        const range = new vscode.Range(startPos, endPos);
+
+        edits.push({ range, newText: updatedTag });
+        successCount++;
+    }
+
+    if (successCount === 0) {
+        vscode.window.showErrorMessage('Could not update any image tags');
+        outputChannel.show();
+        return;
+    }
+
+    // Apply all edits
+    await editor.edit(editBuilder => {
+        for (const edit of edits) {
+            editBuilder.replace(edit.range, edit.newText);
+        }
+    });
+
+    const message = failedCount > 0
+        ? `Updated ${successCount} image tag(s), ${failedCount} failed`
+        : `Updated ${successCount} image tag(s) with dimensions`;
+
+    vscode.window.showInformationMessage(message);
+}
+
+async function updateAllImagesWithLazyAfterCursor(
+    editor: vscode.TextEditor,
+    document: vscode.TextDocument,
+    position: vscode.Position
+): Promise<void> {
+    const text = document.getText();
+    const cursorOffset = document.offsetAt(position);
+
+    // Find all img and source tags in the document
+    const sourceTags = extractTagsFromText(text, 'source');
+    const imgTags = extractTagsFromText(text, 'img');
+
+    const allTags = [...sourceTags, ...imgTags];
+
+    if (allTags.length === 0) {
+        vscode.window.showErrorMessage('No <img> or <source> tags found in the document');
+        return;
+    }
+
+    outputChannel.appendLine(`Found ${allTags.length} image tags (${sourceTags.length} source, ${imgTags.length} img)`);
+    outputChannel.appendLine(`Cursor position: ${cursorOffset}`);
+
+    // Sort tags by their position in reverse order (process from end to beginning)
+    const sortedTags = allTags.sort((a, b) => b.index - a.index);
+
+    let successCount = 0;
+    let failedCount = 0;
+    let lazyCount = 0;
+
+    // Build array of edits to apply
+    const edits: Array<{ range: vscode.Range; newText: string }> = [];
+
+    for (const tag of sortedTags) {
+        const imagePath = extractImagePath(tag.text, document.uri.fsPath);
+        if (!imagePath) {
+            outputChannel.appendLine(`Could not extract image path from: ${tag.text}`);
+            failedCount++;
+            continue;
+        }
+
+        const dimensions = await getImageDimensions(imagePath);
+        if (!dimensions) {
+            outputChannel.appendLine(`Failed to get dimensions for: ${imagePath}`);
+            failedCount++;
+            continue;
+        }
+
+        outputChannel.appendLine(`${tag.type} tag at ${tag.index}: ${dimensions.width}x${dimensions.height} - ${imagePath}`);
+
+        let updatedTag = updateDimensions(tag.text, dimensions.width, dimensions.height);
+
+        // Add loading="lazy" to img tags that are at or after cursor position
+        if (tag.type === 'img' && tag.index >= cursorOffset) {
+            updatedTag = updateLoadingAttribute(updatedTag);
+            lazyCount++;
+            outputChannel.appendLine(`Added loading="lazy" to img tag at ${tag.index}`);
+        }
+
+        const startPos = document.positionAt(tag.index);
+        const endPos = document.positionAt(tag.index + tag.text.length);
+        const range = new vscode.Range(startPos, endPos);
+
+        edits.push({ range, newText: updatedTag });
+        successCount++;
+    }
+
+    if (successCount === 0) {
+        vscode.window.showErrorMessage('Could not update any image tags');
+        outputChannel.show();
+        return;
+    }
+
+    // Apply all edits
+    await editor.edit(editBuilder => {
+        for (const edit of edits) {
+            editBuilder.replace(edit.range, edit.newText);
+        }
+    });
+
+    let message = `Updated ${successCount} image tag(s) with dimensions`;
+    if (lazyCount > 0) {
+        message += `, added loading="lazy" to ${lazyCount} img tag(s) after cursor`;
+    }
+    if (failedCount > 0) {
+        message += `, ${failedCount} failed`;
+    }
+
+    vscode.window.showInformationMessage(message);
 }
 
 export function deactivate() {}

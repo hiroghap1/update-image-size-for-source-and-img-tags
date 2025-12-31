@@ -2,7 +2,7 @@
   "name": "update-image-size-source",
   "displayName": "Update Image Size for Source and Img Tags",
   "description": "Update image size attributes (width/height) and add loading='lazy' for source and img tags",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "icon": "images/icon.png",
   "publisher": "hasegawa-yoshihiro",
   "repository": {
@@ -28,6 +28,14 @@
       {
         "command": "updateImageSizeSource.addLoadingLazy",
         "title": "Update Image Size + Add Loading Lazy"
+      },
+      {
+        "command": "updateImageSizeSource.updateAllImages",
+        "title": "Update All Image Sizes in Page"
+      },
+      {
+        "command": "updateImageSizeSource.updateAllImagesWithLazy",
+        "title": "Update All Image Sizes + Add Loading Lazy After Cursor"
       }
     ],
     "keybindings": [
